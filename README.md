@@ -8,6 +8,10 @@ From the root directory of this repo:
 
 `python deploy_aws.py --config_paths example/s3.config.yml example/svc.config.yml --template_path example/s3.cfn.yml`  
 
+## Help
+
+`python deploy_aws.py -h`
+
 ## Usage  
 
 ` python deploy_aws.py --template_path [TEMPLATE_PATH] --config_paths CONFIG_PATHS [CONFIG_PATHS ...]`  
