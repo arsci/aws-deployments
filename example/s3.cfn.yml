@@ -1,0 +1,26 @@
+Description: >
+  AWS deployment helper script example (S3)
+  
+Parameters:
+
+  pServiceName:
+    Type: String
+    Description: 'The name of the service this template deploys'
+    
+  pBucketName:
+    Type: String
+    Description: 'The name of the bucket'
+    
+Resources:
+
+  rS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Ref pBucketName
+      Tags:
+        - Key: 'ServiceName'
+          Value: !Ref pServiceName
+Outputs:
+  oBucketArn:
+    Value: !GetAtt rS3Bucket.Arn
+    Description: 'The ARN of the S3 bucket created.'
