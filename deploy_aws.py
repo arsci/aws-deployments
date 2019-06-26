@@ -7,6 +7,7 @@ from yaml import load as yaml_load
 import sys
 import argparse
 import logging
+import uuid
 
 def main(config_paths,template_path):
 
@@ -128,6 +129,7 @@ def deploy_to_aws(config_paths,template_path,params,capability,template,client):
     # Boto3 CFN waiters
     waiter_update = client.get_waiter('stack_update_complete')
     waiter_create = client.get_waiter('stack_create_complete')
+    waiter_change = client.get_waiter('change_set_create_complete')
     
     
     logging.info('Generate stackname based on filename')
@@ -184,29 +186,71 @@ def deploy_to_aws(config_paths,template_path,params,capability,template,client):
 
     # If the template exists, attempt to update. Wait, exit when complete or error
     try:
-        logging.info('aws cloudformation update_stack')
+        logging.info('aws cloudformation create_change_set')
         
-        response = client.update_stack(**stack_params)
+        #response = client.update_stack(**stack_params)
         
-        logging.debug('response')
-        logging.debug(response)
+        chng_set_uuid = 'a' + str(uuid.uuid4())
         
-        print("Updating stack " + stack_name + " from template " + template_path + " and config " + config_paths_print)
+        stack_params.update(ChangeSetName=chng_set_uuid)
+        print('Attempting to create change set: ' + chng_set_uuid)
+        response = client.create_change_set(**stack_params)
         
-        logging.info('start update_stack waiter')
+        waiter_change.wait(ChangeSetName=chng_set_uuid, StackName=stack_name,WaiterConfig={'Delay':5})
         
-        waiter_update.wait(StackName=stack_name)
-        
-        print("Stack updated: " + stack_name)
+        change_set = handle_change_set(response,client)
+            
+        if(change_set == -1):
+            response = client.delete_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
+            
+            print('Deleted change set. Exiting.')
+            
+        elif(change_set == 1):
+            response = client.execute_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
+            
+            logging.debug('response')
+            logging.debug(response)
+            
+            print("Updating stack " + stack_name + " from template " + template_path + " and config " + config_paths_print + " with ChangeSet: " + chng_set_uuid )
+            
+            logging.info('start update_stack waiter')
+            
+            waiter_update.wait(StackName=stack_name)
+            
+            print("Stack updated: " + stack_name)
+                
+            
+        else:
+            print('Skipping change set execution: ' + response['Id'])
+            
+        sys.exit(1)
         
     except Exception as e:
         logging.info('handle update exception --> no updates')
         logging.debug(e)
+        response = client.delete_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
         print("No updates to be performed on stack " + stack_name + " from template " + template_path + " and config " + config_paths_print)
         
         pass
     
     return 0
+    
+def handle_change_set(response,client):
+    
+    execute = -2
+    
+    response_chng_set = client.describe_change_set(ChangeSetName=response['Id'])
+    
+    print('')
+    print(json.dumps(response_chng_set, indent=6, sort_keys=True, default=str))
+    print('')
+    
+    while((execute != "0") and (execute != "1") and (execute != "-1")):
+        execute = raw_input("Select 1 to execute change set, 0 to skip/retain change set, -1 to delete change set: ")
+        print(execute)
+        
+    return int(execute)
+        
     
 def parse_args():
     
