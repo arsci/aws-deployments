@@ -82,7 +82,7 @@ def process_validation(configs,template_path,cfn_client):
     # This will check basic syntax, and return the parameters needed for the template and the capabilities requirement.
     # TODO: Add error handling for invalid template. This assumes valid template
     response_validate = cfn_client.validate_template(
-            TemplateBody=template
+        TemplateBody=template
     )
     
     logging.debug('response')
@@ -191,7 +191,9 @@ def deploy_to_aws(args,params,capability,cfn_template,cfn_client):
         waiter_change.wait(ChangeSetName=chng_set_uuid, StackName=stack_name,WaiterConfig={'Delay':5})
         
         if(args.auto_approve == False): change_set = handle_change_set_inq(response_create_chng_set,cfn_client)['val']
-        else: change_set = 1
+        else: 
+            print("Change Set Auto-Aproved")
+            change_set = 1
             
         if(change_set == -1):
             response_delete_chng_set = cfn_client.delete_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
@@ -254,10 +256,10 @@ def handle_change_set_inq(response, cfn_client):
     print('')
     
     questions = [
-      inquirer.List('selection',
-                    message="Change Set Selection:",
-                    choices=['Execute Change Set', 'Cancel & Delete Change Set', 'Cancel & Save Change Set'],
-                ),
+        inquirer.List('selection',
+            message="Change Set Selection:",
+            choices=['Execute Change Set', 'Cancel & Delete Change Set', 'Cancel & Save Change Set'],
+        ),
     ]
     print('')
     ans = inquirer.prompt(questions)
