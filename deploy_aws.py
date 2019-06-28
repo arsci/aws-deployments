@@ -8,8 +8,9 @@ import sys
 import argparse
 import logging
 import uuid
+import inquirer
 
-def main(config_paths,template_path):
+def main(config_paths,template_path,auto_approve):
 
     logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
     
@@ -32,12 +33,8 @@ def main(config_paths,template_path):
     cfn_capability_requirement = params[1]
     cfn_template = params[2]
     
-    # print(params[0])
-    # print(params[1])
-    # print(params[2])
-    
     # Deploy to AWS. Will attempt to update if the stack exists, will attempt to create if not.
-    deploy_to_aws(config_paths,template_path,param_json_object,cfn_capability_requirement,cfn_template,client)
+    deploy_to_aws(config_paths,template_path,param_json_object,cfn_capability_requirement,cfn_template,client,auto_approve)
     
     # Done.
     return 0
@@ -87,12 +84,12 @@ def generate_params(configs,template_path,client):
     # Validate template with AWS
     # This will check basic syntax, and return the parameters needed for the template and the capabilities requirement.
     # TODO: Add error handling for invalid template. This assumes valid template
-    response = client.validate_template(
+    response_validate = client.validate_template(
             TemplateBody=template
     )
     
     logging.debug('response')
-    logging.debug(response)
+    logging.debug(response_validate)
     
     params = [ ]
     
@@ -100,7 +97,7 @@ def generate_params(configs,template_path,client):
     
     # Match up the parameters needed by the template with the params provided by the config file
     # and generate the CloudFormation compliant json parameters object structure
-    for idx, template_key in enumerate(response['Parameters']):
+    for idx, template_key in enumerate(response_validate['Parameters']):
         
         param_obj = { }
         
@@ -116,7 +113,7 @@ def generate_params(configs,template_path,client):
     
     # Get the capability requirement (if exists)
     try:
-        capability = response['Capabilities']
+        capability = response_validate['Capabilities']
     except: 
         capability = None
     
@@ -124,18 +121,17 @@ def generate_params(configs,template_path,client):
     
     return params, capability, template
     
-def deploy_to_aws(config_paths,template_path,params,capability,template,client):
+def deploy_to_aws(config_paths,template_path,params,capability,template,client,auto_approve):
     
     # Boto3 CFN waiters
     waiter_update = client.get_waiter('stack_update_complete')
     waiter_create = client.get_waiter('stack_create_complete')
     waiter_change = client.get_waiter('change_set_create_complete')
     
-    
     logging.info('Generate stackname based on filename')
     
     # Generate the stack-name based on the filename of the template provided
-    stack_name = template_path.split('.')[0].split('/')[-1]
+    stack_name = template_path.split('.')[0].split('/')[-1].upper()
     config_paths_print = ' '.join(config_paths)
     
     logging.debug('Stack name: ' + stack_name)
@@ -157,26 +153,26 @@ def deploy_to_aws(config_paths,template_path,params,capability,template,client):
     try:
         logging.info('aws cloudformation describe_stacks')
         
-        response = client.describe_stacks(StackName=stack_name)
+        response_describe = client.describe_stacks(StackName=stack_name)
         
         logging.debug('response')
-        logging.debug(response)
+        logging.debug(response_describe)
         
     # If not, attempt to create it, wait, exit when complete or error    
     except botocore.exceptions.ClientError as e:
         logging.info('handle describe exception --> create')
         logging.debug(e)
         
-        logging.info('aws cloudformation create_stack')
+        logging.info('Running Cmd: aws cloudformation create_stack')
         
-        response = client.create_stack(**stack_params)
+        response_create = client.create_stack(**stack_params)
         
         logging.debug('response')
-        logging.debug(response)
+        logging.debug(response_create)
         
         print("Creating stack " + stack_name + " from template " + template_path + " and config " + config_paths_print)
         
-        logging.info('start create_stack waiter')
+        logging.info('Start create_stack waiter')
         
         waiter_create.wait(StackName=stack_name)
         
@@ -188,28 +184,27 @@ def deploy_to_aws(config_paths,template_path,params,capability,template,client):
     try:
         logging.info('aws cloudformation create_change_set')
         
-        #response = client.update_stack(**stack_params)
-        
-        chng_set_uuid = 'a' + str(uuid.uuid4())
+        chng_set_uuid = ('a' + str(uuid.uuid4())).upper()
         
         stack_params.update(ChangeSetName=chng_set_uuid)
         print('Attempting to create change set: ' + chng_set_uuid)
-        response = client.create_change_set(**stack_params)
+        response_create_chng_set = client.create_change_set(**stack_params)
         
         waiter_change.wait(ChangeSetName=chng_set_uuid, StackName=stack_name,WaiterConfig={'Delay':5})
         
-        change_set = handle_change_set(response,client)
+        if(auto_approve == False): change_set = handle_change_set_inq(response_create_chng_set,client)
+        else: change_set = 1
             
         if(change_set == -1):
-            response = client.delete_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
+            response_delete_chng_set = client.delete_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
             
             print('Deleted change set. Exiting.')
             
         elif(change_set == 1):
-            response = client.execute_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
+            response_exec_chng_set = client.execute_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
             
             logging.debug('response')
-            logging.debug(response)
+            logging.debug(response_exec_chng_set)
             
             print("Updating stack " + stack_name + " from template " + template_path + " and config " + config_paths_print + " with ChangeSet: " + chng_set_uuid )
             
@@ -218,10 +213,9 @@ def deploy_to_aws(config_paths,template_path,params,capability,template,client):
             waiter_update.wait(StackName=stack_name)
             
             print("Stack updated: " + stack_name)
-                
-            
+
         else:
-            print('Skipping change set execution: ' + response['Id'])
+            print('Skipping change set execution: ' + response_create_chng_set['Id'])
             
         sys.exit(1)
         
@@ -250,7 +244,21 @@ def handle_change_set(response,client):
         print(execute)
         
     return int(execute)
-        
+    
+def handle_change_set_inq(response, client):
+    
+    questions = [
+      inquirer.List('selection',
+                    message="Change Set Selection:",
+                    choices=['Execute Change Set', 'Cancel & Delete Change Set', 'Cancel & Save Change Set'],
+                ),
+    ]
+    print('')
+    ans = inquirer.prompt(questions)
+    
+    if(ans['selection'] == 'Execute Change Set'): return 1
+    elif(ans['selection'] == 'Cancel & Delete Change Set'): return -1
+    else: return 0
     
 def parse_args():
     
@@ -258,6 +266,8 @@ def parse_args():
 
     parser.add_argument('--config_paths', type=str, nargs='+', help='Filepath to one or more config files (YAML)')
     parser.add_argument('--template_path', type=str, help='Filepath to a single CloudFormation template (YAML or JSON')
+    
+    parser.add_argument('--auto_approve', type=bool, help='Auto-approve change set', nargs='?', default=False, const=True)
     
     args = parser.parse_args()
     
@@ -268,7 +278,7 @@ if __name__ == "__main__":
     print('Starting AWS deployment...')
     
     args = parse_args()
-    
-    main(args.config_paths,args.template_path)
+
+    main(args.config_paths,args.template_path,args.auto_approve)
     
     sys.exit(0)

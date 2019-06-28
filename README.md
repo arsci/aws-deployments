@@ -2,6 +2,12 @@
 
 Deploy a template (YAML or JSON) from a set (or single) configuration files (YAML)
 
+## Install
+
+Packages needed can be installed from the requirements file:
+
+`pip install -r requirements.txt --user`
+
 ## Example
 
 From the root directory of this repo:
