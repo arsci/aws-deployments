@@ -27,10 +27,10 @@ def main(args):
     # param_json_object: parameters json structure for cfn
     # cfn_capability_requirement: capability requirement
     # cfn_template: the template body
-    validation = process_validation(configs,args.template_path,cfn_client)
+    validation = process_validation(configs,args.template_path,cfn_client, args.sam)
     
     # Deploy to AWS. Will attempt to update if the stack exists, will attempt to create if not.
-    deploy_to_aws(args,validation['param_json_object'],validation['cfn_capability_requirement'],validation['cfn_template'],cfn_client)
+    deploy_to_aws(args,validation['param_json_object'],validation['cfn_capability_requirement'],validation['cfn_template'],cfn_client,args.env)
     
     # Done.
     return 0
@@ -58,7 +58,7 @@ def get_configs(config_paths):
     return configs
 
 #def generate_params(configs,template_path,cfn_client):
-def process_validation(configs,template_path,cfn_client):
+def process_validation(configs,template_path,cfn_client,sam):
     
     logging.debug('-GENERATE_PARAMS')
     logging.info("Loading template file: " + template_path)
@@ -113,13 +113,15 @@ def process_validation(configs,template_path,cfn_client):
         capability = response_validate['Capabilities']
     except: 
         capability = None
+        if sam:
+            capability = ['CAPABILITY_IAM']
     
     logging.debug(capability)
     
     return { "param_json_object": params, "cfn_capability_requirement": capability, "cfn_template": template }
     
 #def deploy_to_aws(config_paths,template_path,params,capability,template,cfn_client,auto_approve):
-def deploy_to_aws(args,params,capability,cfn_template,cfn_client):
+def deploy_to_aws(args,params,capability,cfn_template,cfn_client,env):
     
     # Boto3 CFN waiters
     waiter_update = cfn_client.get_waiter('stack_update_complete')
@@ -129,7 +131,7 @@ def deploy_to_aws(args,params,capability,cfn_template,cfn_client):
     logging.info('Generate stackname based on filename')
     
     # Generate the stack-name based on the filename of the template provided. Strip folder path/file extenstions.
-    stack_name = args.template_path.split('.')[0].split('/')[-1].upper()
+    stack_name = args.template_path.split('.')[0].split('/')[-1].upper() + '-' + env.upper()
     config_paths_print = ' '.join(args.config_paths)
     
     logging.debug('Stack name: ' + stack_name)
@@ -276,6 +278,9 @@ def parse_args():
     parser.add_argument('--template_path', type=str, help='Filepath to a single CloudFormation template (YAML or JSON')
     
     parser.add_argument('--auto_approve', type=bool, help='Auto-approve change set', nargs='?', default=False, const=True)
+    parser.add_argument('--sam', type=bool, help='Inlude if using SAM', nargs='?', default=False, const=True)
+    
+    parser.add_argument('--env', type=str, help='Env specifier. Default is dev', nargs='?', default='dev')
     
     args = parser.parse_args()
     
