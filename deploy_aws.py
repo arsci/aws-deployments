@@ -42,16 +42,39 @@ def get_configs(config_paths):
     
     configs = { } # Get configs from yaml file
     
-    for file_path in config_paths:
-        try:
-            with open(file_path) as f:
-                configs.update(yaml_load(f))
-                
-            logging.info('Config file loaded: ' + file_path)
     
-        except Exception as e:
-            logging.critical("Failed to load config file: " + file_path)
-            logging.critical(e)
+    for file_path in config_paths:
+        
+        if(file_path.find('s3://') == 0):
+            try:
+                s3_client = boto3.client('s3')
+                
+                s3_array = file_path.split('/')
+                
+                bucket = s3_array[2]
+                key = file_path.replace('s3://' + bucket + '/','')  
+                
+                s3_response = s3_client.get_object(
+                    Bucket=bucket,
+                    Key=key
+                )
+                
+                configs.update(yaml_load(s3_response['Body'].read()))
+                
+            except Exception as e:
+                logging.critical("Failed to load config file: " + file_path)
+                logging.critical(e)
+            
+        else:
+            try:
+                with open(file_path) as f:
+                    configs.update(yaml_load(f))
+                    
+                logging.info('Config file loaded: ' + file_path)
+        
+            except Exception as e:
+                logging.critical("Failed to load config file: " + file_path)
+                logging.critical(e)
     
     logging.debug(configs)
     
@@ -64,16 +87,38 @@ def process_validation(configs,template_path,cfn_client,sam):
     logging.info("Loading template file: " + template_path)
     
     # Get the template based on the file path given
-    try:
-        with open (template_path, "r") as file:
-            template = file.read()
+    
+    if(template_path.find('s3://') == 0):
+        try:
+            s3_client = boto3.client('s3')
+                    
+            s3_array = template_path.split('/')
             
-        logging.info('Template file lodaded: ' + template_path)    
-        logging.debug(template)    
-        
-    except Exception as e:
-        logging.critical("Failed to load template file: " + template_path)
-        logging.critical(e)
+            bucket = s3_array[2]
+            key = template_path.replace('s3://' + bucket + '/','')  
+            
+            s3_response = s3_client.get_object(
+                Bucket=bucket,
+                Key=key
+            )
+            
+            template = s3_response['Body'].read()
+                    
+        except Exception as e:
+            logging.critical("Failed to load template file: " + template_path)
+            logging.critical(e)
+            
+    else:
+        try:
+            with open (template_path, "r") as file:
+                template = file.read()
+                
+            logging.info('Template file lodaded: ' + template_path)    
+            logging.debug(template)    
+            
+        except Exception as e:
+            logging.critical("Failed to load template file: " + template_path)
+            logging.critical(e)
         
     
     logging.info('aws cloudformation validate-template')
@@ -131,7 +176,8 @@ def deploy_to_aws(args,params,capability,cfn_template,cfn_client,env):
     logging.info('Generate stackname based on filename')
     
     # Generate the stack-name based on the filename of the template provided. Strip folder path/file extenstions.
-    stack_name = args.template_path.split('.')[0].split('/')[-1].upper() + '-' + env.upper()
+    if(env == 'none'): stack_name = args.template_path.split('.')[0].split('/')[-1].upper()
+    else: stack_name = args.template_path.split('.')[0].split('/')[-1].upper() + '-' + env.upper()
     config_paths_print = ' '.join(args.config_paths)
     
     logging.debug('Stack name: ' + stack_name)
@@ -280,7 +326,7 @@ def parse_args():
     parser.add_argument('--auto_approve', type=bool, help='Auto-approve change set', nargs='?', default=False, const=True)
     parser.add_argument('--sam', type=bool, help='Inlude if using SAM', nargs='?', default=False, const=True)
     
-    parser.add_argument('--env', type=str, help='Env specifier. Default is dev', nargs='?', default='dev')
+    parser.add_argument('--env', type=str, help='Env specifier. Default is dev', nargs='?', default='none')
     
     args = parser.parse_args()
     
