@@ -19,7 +19,6 @@ def main(args):
     cfn_client = boto3.client('cloudformation')
     
     # Get the config parameters from the specified YAML file. 
-    # TODO: Support multiple config file inputs
     configs = get_configs(args.config_paths)
     
     # Generate CloudFormation compliant parameter json structure, determine capabilities needed, and get the template (aws validation function)
@@ -28,12 +27,6 @@ def main(args):
     # cfn_capability_requirement: capability requirement
     # cfn_template: the template body
     validation = process_validation(configs,args.template_path,cfn_client,args.sam)
-    
-    ###
-    
-    #sys.exit(0)
-    
-    ###
     
     # Deploy to AWS. Will attempt to update if the stack exists, will attempt to create if not.
     deploy_to_aws(args,validation['param_json_object'],validation['cfn_capability_requirement'],validation['cfn_template'],cfn_client,args.env)
