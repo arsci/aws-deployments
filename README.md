@@ -31,7 +31,6 @@ You can include an environment specifier. Env is appended to the stack name (whi
 
 `--env prod`
 
-If no environment is specified `DEV` is used.
 
 ## Usage  
 

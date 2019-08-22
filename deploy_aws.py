@@ -326,7 +326,7 @@ def parse_args():
     parser.add_argument('--auto_approve', type=bool, help='Auto-approve change set', nargs='?', default=False, const=True)
     parser.add_argument('--sam', type=bool, help='Inlude if using SAM', nargs='?', default=False, const=True)
     
-    parser.add_argument('--env', type=str, help='Env specifier. Default is dev', nargs='?', default='none')
+    parser.add_argument('--env', type=str, help='Env specifier', nargs='?', default='none')
     
     args = parser.parse_args()
     
