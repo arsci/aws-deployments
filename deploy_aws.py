@@ -27,7 +27,13 @@ def main(args):
     # param_json_object: parameters json structure for cfn
     # cfn_capability_requirement: capability requirement
     # cfn_template: the template body
-    validation = process_validation(configs,args.template_path,cfn_client, args.sam)
+    validation = process_validation(configs,args.template_path,cfn_client,args.sam)
+    
+    ###
+    
+    #sys.exit(0)
+    
+    ###
     
     # Deploy to AWS. Will attempt to update if the stack exists, will attempt to create if not.
     deploy_to_aws(args,validation['param_json_object'],validation['cfn_capability_requirement'],validation['cfn_template'],cfn_client,args.env)
@@ -143,14 +149,11 @@ def process_validation(configs,template_path,cfn_client,sam):
         
         param_obj = { }
         
-        try:
-            param_obj['ParameterKey'] = template_key['ParameterKey']
-            param_obj['ParameterValue'] = configs[template_key['ParameterKey']]
-            params.append(param_obj)
-            logging.debug(param_obj)
-        except:
-            pass
-        
+        param_obj['ParameterKey'] = template_key['ParameterKey']
+        param_obj['ParameterValue'] = configs[template_key['ParameterKey']]
+        params.append(param_obj)
+        logging.debug(param_obj)
+
     logging.info('Get Capabilities')
     
     # Get the capability requirement (if exists)
