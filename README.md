@@ -18,6 +18,19 @@ From the root directory of this repo:
 
 `python deploy_aws.py -h`
 
+## S3
+
+Config files and templates can be loaded from S3 using standard s3 prefix:
+
+`... --config_paths s3://bucket/object/key.config.yml ...`  
+`... --template_path s3://bucket/object/key.cfn.yml...`
+
+## Env
+
+You can include an environment specifier. Env is appended to the stack name (which is a function of the filename).
+
+`--env prod`
+
 ## Usage  
 
 ` python deploy_aws.py --template_path [TEMPLATE_PATH] --config_paths CONFIG_PATHS [CONFIG_PATHS ...]`  
