@@ -84,28 +84,34 @@ def process_validation(configs,template_path,cfn_client,sam):
     
     logging.debug('-GENERATE_PARAMS')
     logging.info("Loading template file: " + template_path)
+
+    templateURL = None
     
     # Get the template based on the file path given
     
     if(template_path.find('s3://') == 0):
-        try:
-            s3_client = boto3.client('s3')
+
+        templateURL = template_path.replace('s3://','https://s3.amazonaws.com/')
+        template = template_path
+
+    #     try:
+    #         s3_client = boto3.client('s3')
                     
-            s3_array = template_path.split('/')
+    #         s3_array = template_path.split('/')
             
-            bucket = s3_array[2]
-            key = template_path.replace('s3://' + bucket + '/','')  
+    #         bucket = s3_array[2]
+    #         key = template_path.replace('s3://' + bucket + '/','')  
             
-            s3_response = s3_client.get_object(
-                Bucket=bucket,
-                Key=key
-            )
+    #         s3_response = s3_client.get_object(
+    #             Bucket=bucket,
+    #             Key=key
+    #         )
             
-            template = s3_response['Body'].read()
+    #         template = s3_response['Body'].read()
                     
-        except Exception as e:
-            logging.critical("Failed to load template file: " + template_path)
-            logging.critical(e)
+    #     except Exception as e:
+    #         logging.critical("Failed to load template file: " + template_path)
+    #         logging.critical(e)
             
     else:
         try:
@@ -125,9 +131,15 @@ def process_validation(configs,template_path,cfn_client,sam):
     # Validate template with AWS
     # This will check basic syntax, and return the parameters needed for the template and the capabilities requirement.
     # TODO: Add error handling for invalid template. This assumes valid template
-    response_validate = cfn_client.validate_template(
-        TemplateBody=template
-    )
+    
+    if(templateURL):
+        response_validate = cfn_client.validate_template(
+            TemplateURL=templateURL
+        )
+    else:
+        response_validate = cfn_client.validate_template(
+            TemplateBody=template
+        )
     
     logging.debug('response')
     logging.debug(response_validate)
@@ -141,11 +153,13 @@ def process_validation(configs,template_path,cfn_client,sam):
     for idx, template_key in enumerate(response_validate['Parameters']):
         
         param_obj = { }
-        
-        param_obj['ParameterKey'] = template_key['ParameterKey']
-        param_obj['ParameterValue'] = configs[template_key['ParameterKey']]
-        params.append(param_obj)
-        logging.debug(param_obj)
+        try:
+            param_obj['ParameterKey'] = template_key['ParameterKey']
+            param_obj['ParameterValue'] = configs[template_key['ParameterKey']]
+            params.append(param_obj)
+            logging.debug(param_obj)
+        except: 
+            pass
 
     logging.info('Get Capabilities')
     
@@ -182,7 +196,13 @@ def deploy_to_aws(args,params,capability,cfn_template,cfn_client,env):
     # Generate the boto3 parameters
     stack_params = { }
     stack_params.update(StackName=stack_name)
-    stack_params.update(TemplateBody=cfn_template)
+
+    if(cfn_template.find('s3://') == 0):
+        templateURL = cfn_template.replace('s3://','https://s3.amazonaws.com/')
+        stack_params.update(TemplateURL=templateURL)
+    else:
+        stack_params.update(TemplateBody=cfn_template)
+
     stack_params.update(Parameters=params)
     
     # If there's a capability requirement, add the boto3 param
