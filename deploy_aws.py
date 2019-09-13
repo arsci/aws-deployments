@@ -15,7 +15,9 @@ def main(args):
     logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
     
     logging.debug('-MAIN-')
-    
+
+    boto3.setup_default_session(profile_name=args.profile)
+
     cfn_client = boto3.client('cloudformation')
     
     # Get the config parameters from the specified YAML file. 
@@ -284,6 +286,7 @@ def deploy_to_aws(args,params,capability,cfn_template,cfn_client,env):
     except Exception as e:
         logging.info('handle update exception --> no updates')
         logging.debug(e)
+        print(e)
         response = cfn_client.delete_change_set(ChangeSetName=chng_set_uuid, StackName=stack_name)
         print("No updates to be performed on stack " + stack_name + " from template " + args.template_path + " and config " + config_paths_print)
         
@@ -344,6 +347,8 @@ def parse_args():
     
     parser.add_argument('--env', type=str, help='Env specifier', nargs='?', default='none')
     
+    parser.add_argument('--profile', type=str, help='AWS profile specifier', nargs='?', default='default')
+
     args = parser.parse_args()
     
     return args
