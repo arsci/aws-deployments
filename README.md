@@ -25,11 +25,19 @@ Config files and templates can be loaded from S3 using standard s3 prefix:
 `... --config_paths s3://bucket/object/key.config.yml ...`  
 `... --template_path s3://bucket/object/key.cfn.yml...`
 
+If you specify an S3 URI for the template path, the stack commands will us `TemplateURL` instead of `TemplateBody`
+
 ## Env
 
 You can include an environment specifier. Env is appended to the stack name (which is a function of the filename).
 
 `--env prod`
+
+## Profile
+
+You can specify a local AWS CLI profile. If no profile is specified default is used.
+
+`--profile default`
 
 
 ## Usage  
