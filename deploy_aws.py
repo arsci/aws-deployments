@@ -95,25 +95,6 @@ def process_validation(configs,template_path,cfn_client,sam):
 
         templateURL = template_path.replace('s3://','https://s3.amazonaws.com/')
         template = template_path
-
-    #     try:
-    #         s3_client = boto3.client('s3')
-                    
-    #         s3_array = template_path.split('/')
-            
-    #         bucket = s3_array[2]
-    #         key = template_path.replace('s3://' + bucket + '/','')  
-            
-    #         s3_response = s3_client.get_object(
-    #             Bucket=bucket,
-    #             Key=key
-    #         )
-            
-    #         template = s3_response['Body'].read()
-                    
-    #     except Exception as e:
-    #         logging.critical("Failed to load template file: " + template_path)
-    #         logging.critical(e)
             
     else:
         try:
@@ -344,9 +325,7 @@ def parse_args():
     
     parser.add_argument('--auto_approve', type=bool, help='Auto-approve change set', nargs='?', default=False, const=True)
     parser.add_argument('--sam', type=bool, help='Inlude if using SAM', nargs='?', default=False, const=True)
-    
     parser.add_argument('--env', type=str, help='Env specifier', nargs='?', default='none')
-    
     parser.add_argument('--profile', type=str, help='AWS profile specifier', nargs='?', default='default')
 
     args = parser.parse_args()
